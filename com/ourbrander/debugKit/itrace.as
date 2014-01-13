@@ -8,12 +8,10 @@
 	liuyi
 	 */
 	public function itrace(...obj):void {
-		trace(obj)
-		try{
-			outputPanel.dtrace(obj)
-		}catch (e) {
-			trace("itrace error:"+e)
-		} 
+		if (!debug.enabled) return;
+		trace(obj);
+		outputPanel.dtrace(obj)
+		
 	}
 	 
 		 

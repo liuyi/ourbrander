@@ -1,10 +1,11 @@
 ﻿package com.ourbrander.video  
 {
+	import com.ourbrander.debugKit.itrace;
 	import flash.display.MovieClip;
 	import flash.display.Shape;
+	import flash.display.Sprite;
 	import flash.events.AsyncErrorEvent;
 	import flash.events.Event;
-	import flash.events.IOErrorEvent;
 	import flash.events.NetStatusEvent;
 	import flash.media.SoundTransform;
 	import flash.media.Video;
@@ -20,7 +21,7 @@
 	 * update:2010-12-29
 	 * 
 	 */
-	public class EasyVideo extends MovieClip 
+	public class EasyVideo extends Sprite 
 	{
 		protected var _video:Video
 		protected var _stream:NetStream
@@ -52,10 +53,11 @@
 		public var onPlayCompleted:Function
 		public var onInited:Function
 		public var onLoaded:Function
-		public var onLoadError:Function
+		public var closeSteam:Boolean = true
+		public var onCuePoint:Function
+		public var onError:Function;
 		
 		protected var _bg:Shape
-		public var autoDestory:Boolean;
 		
 		
 		public function EasyVideo(w:uint = 640,h:uint=480 ) :void
@@ -65,20 +67,24 @@
 			addEventListener(Event.ADDED_TO_STAGE,addedToStage)
 		}
 		
+		//===============================================================================================
+		//===============================================================================================
 		protected function addedToStage(e:Event):void 
 		{
-			
+			removeEventListener(Event.ADDED_TO_STAGE, addedToStage);
 			addEventListener(Event.REMOVED_FROM_STAGE,removedFromStage)
 		}
 		
+		//===============================================================================================
+		//===============================================================================================
 		protected function removedFromStage(e:Event):void 
 		{
 			removeEventListener(Event.REMOVED_FROM_STAGE, removedFromStage);
-			if (autoDestory) {
-				removeEventListener(Event.ADDED_TO_STAGE, addedToStage);
-				destory()
-			}
+			destory()
 		}
+		
+		//===============================================================================================
+		//===============================================================================================
 		protected function init(w:uint = 640,h:uint=360) :void{
 			_playedTime = 0;
 			_isPlaying = false;
@@ -91,19 +97,22 @@
 			_bg.graphics.drawRect(0, 0, w, h);
 			_cuePoints = [];
 			addChild(_bg);
-			
-			autoDestory = true;
 		}
 		
+		//===============================================================================================
+		//===============================================================================================
 		protected function destory():void {
 			
 			this.removeEventListener(Event.ENTER_FRAME, smoothVolume)
 			stopCheckProgress();
-			if(_stream!=null){
-			_stream.removeEventListener(AsyncErrorEvent.ASYNC_ERROR, asyncErrorHandler);
-			_stream.removeEventListener(NetStatusEvent.NET_STATUS, onNs_NetStatusHandler);
-			_stream.close();
-			_stream = null
+			
+			if (_stream != null) {
+				_stream.removeEventListener(AsyncErrorEvent.ASYNC_ERROR, asyncErrorHandler);
+				_stream.removeEventListener(NetStatusEvent.NET_STATUS, onNs_NetStatusHandler);
+				_stream.pause();
+				if(closeSteam)
+				_stream.close();
+				_stream = null
 			}
 			_nsClient = null
 			
@@ -111,8 +120,9 @@
 			_connet.close()
 			_connet.removeEventListener(NetStatusEvent.NET_STATUS, onNetStatusHandler);
 			_connet = null
-			}
 			_connetClient = null
+			}
+	
 			_soundTransform=null
 			
 		
@@ -161,9 +171,20 @@
 			return _videoHeight
 		}
 		
+		public function set videoWidth(w:Number):void {
+			 _videoWidth = w;
+			 _video.width = w;
+		}
+		
+		public function set videoHeight(h:Number):void {
+			 _videoHeight=h
+			  _video.height =h
+		}
+		
 		public function get videoPath():String {
 			return _videoPath;
 		}
+		
 		
 		public function playVideo(path:String="",start:Number=0,autoPlay:Boolean=true,bufferTime:Number=2) :void
 		{
@@ -173,6 +194,8 @@
 			_autoPlay=autoPlay
 			_stream.bufferTime = bufferTime; 
 			_stream.play(_videoPath, start);
+			
+			itrace("path:"+_videoPath)
 			
 			if (! _autoPlay) {
 				_stream.pause();
@@ -185,6 +208,8 @@
 		}
 		/*not finished*/
 		public function attachStream(str:NetStream):void {
+		//	if (server == null) { server = "" };
+			initData(str)
 			_stream = str;
 			_video.attachNetStream(_stream);
 		}
@@ -268,22 +293,6 @@
 			return 0;
 		}
 		
-		public function get bytesLoaded():Number {
-			if (_stream != null) {
-				return _stream.bytesLoaded
-			}
-			return 0;
-		}
-		
-		public function get bytesTotal():Number {
-			if (_stream != null) {
-				return _stream.bytesTotal
-			}
-			
-			return 0;
-			
-		}
-		
 		
 		protected function smoothVolume(e:Event):void {
 			_soundTransform.volume += (_targetVolume-_soundTransform.volume) * _volumeSpeed;
@@ -327,20 +336,26 @@
 		}
 		
 		protected function sendError(e:NetStatusEvent):void {
+			if(onError!=null){
+				onError();
+			}
 			dispatchEvent(e);
 		}
 		
-		protected function initData():void {
-			//trace("init data")
+		protected function initData(steam:NetStream=null):void {
+			trace("init data")
+			if(steam==null)
 			_stream = new NetStream(_connet)
+			else _stream = steam;
+			
 			_stream.addEventListener(AsyncErrorEvent.ASYNC_ERROR, asyncErrorHandler);
 			_stream.addEventListener(NetStatusEvent.NET_STATUS, onNs_NetStatusHandler);
-			 
+
 			_nsClient={}
 			_nsClient.onMetaData = onMetaData
+			_nsClient.onCuePoint = cuePointCallback;
 			_stream.client=_nsClient
 			_video = new Video();
-			_video.smoothing = true;
 			_video.attachNetStream(_stream);
 			
 			addChild(_video);
@@ -349,13 +364,14 @@
 			
 
 		}
-		
-		 
+		protected function cuePointCallback(data:Object):void {
+			if(onCuePoint!=null) onCuePoint(data)
+		}
 		protected function asyncErrorHandler(event:AsyncErrorEvent):void
 		{
-                trace("asyncErrorHandler:" + event);
+                trace("asyncErrorHandler:"+event)
 		}
-		protected function onMetaData(obj:Object) :void {
+		public function onMetaData(obj:Object) :void {
 			if (_inited) {
 				return
 			}
@@ -366,8 +382,7 @@
 			
 			_video.width = _videoWidth;
 			_video.height = _videoHeight;
-			_video.height = _videoHeight;
-			//trace("onMetaData")
+			trace("onMetaData")
 			 _bg.width = _videoWidth;
 			 _bg.height = _videoHeight;
 			if (onInited != null) {
@@ -380,22 +395,20 @@
 		
 		protected function onNs_NetStatusHandler(e:NetStatusEvent):void
 		{
-		
+			
 			if(e.info.code=="NetStream.Play.Stop"){
 				_isPlaying = false;
+				
+			 
 				if (onPlayCompleted != null) {
 					onPlayCompleted();
 				}
 			}
 			
-			if (e.info.code=="NetStream.Play.StreamNotFound") {
-				trace("play video error: " + e);
-				if (onLoadError != null) {
-					onLoadError();
-				}
+			if (e.info.code=="NetStream.Seek.InvalidTime") {
+				
 			}
-			//dispatchEvent(e.clone());
-			
+			dispatchEvent(e.clone());
 		}
 	
 		
@@ -412,7 +425,6 @@
 		}
 		
         private function onProgress (e:Event) : void {
-			//if (_stream != null) return;
 			if ( _stream.bytesTotal > 4)     {
 					_loadedPercent = _stream.bytesLoaded /  _stream.bytesTotal ;
 					if (_loadedPercent >= 1) {
@@ -427,8 +439,6 @@
 				onLoadProgress()
 			}
         }
-		
-		
 
 	}
 

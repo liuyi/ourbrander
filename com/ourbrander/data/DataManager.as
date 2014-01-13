@@ -1,6 +1,6 @@
 ﻿package com.ourbrander.data 
 {
-	import com.ourbrander.xmlObject.xmlFrame;
+
 	import flash.events.EventDispatcher;
 	import flash.text.StyleSheet;
 	/**
@@ -67,7 +67,7 @@
 		public function set data(d:XML) :void {
 			
 			_xml = d;
-			language=_xml.language.@default
+			language=_xml.language.@defaultLan
 			setCss()
 		}
 		public function get data():XML {
@@ -113,7 +113,7 @@
 			if (_xml.css == null) { return };
 			var css_len:uint = _xml.css.child("*").length();
 		
-			for (var i = 0; i < css_len; i++ ) {
+			for (var i:int = 0; i < css_len; i++ ) {
 				
 				var tcss:StyleSheet = new StyleSheet();
 				tcss.parseCSS(_xml.css.child(i));

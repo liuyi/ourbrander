@@ -1,5 +1,6 @@
-package com.ourbrander.deepLink 
+﻿package com.ourbrander.deepLink 
 {
+	import com.ourbrander.debugKit.itrace;
 	import flash.events.Event;
 	import flash.events.EventDispatcher;
 	import flash.events.IEventDispatcher;
@@ -8,9 +9,11 @@ package com.ourbrander.deepLink
 	import flash.net.URLRequest;
 
 	
-	/**update:2011/3/3 add autoDeactive, if autoDeactive=false,then it would not   dispatch Event.Deavtive.
+	/**
+	 * update:2011/12/15 15:19  changed Event.Deavtive to Deeplink.Deavtive, because Event.Deavtive has  confusion bug  . 
+	 * update:2011/3/3 add autoDeactive, if autoDeactive=false,then it would not   dispatch Event.Deavtive.
 	 * update: 2011-1-25; modied open()
-	 * Deeplink update:2011-1-5,added three events:Event.ACTIVATE , DeepLink.DEACTIVATE and Event.OPEN,when user open a new page or leave the current page, DeepLink.DEACTIVATE will occured.
+	 * Deeplink update:2011-1-5,added three events:Event.ACTIVATE , Event.DEACTIVATE and Event.OPEN,when user open a new page or leave the current page, Event.DEACTIVATE will occured.
 	 * Event.ACTIVATE will be occured when user come back this page,or open this page.Event.OPEN will be occured when user open a new page (html page).
 	 * 
 	 * DeepLink is very simple and easier use.It can make visit flash like html.update:2010-12-31, version:1.1
@@ -18,7 +21,7 @@ package com.ourbrander.deepLink
 	 * check latest version on:<a href="http://www.ourbrander.com/p/deeplink" target="blank">http://www.ourbrander.com/p/deeplink</a>
 		
 	
-	 * @version 1.6
+	 * @version 1.7
 	 * @author liuyi 
 	 * @example 
 
@@ -76,14 +79,16 @@ package com.ourbrander.deepLink
 	{
 		/**@private */
         private static var _deepLink:DeepLink;
-		public static var DEACTIVATE :String= "deeplink_deactivate" ;
 		/**@private */
 		private var _params:Array;
 		/**@private */
 		private var _history:Array;
 		
-		public  var autoDeactive:Boolean=false
+		public var autoDeactive:Boolean
+		public var autoActive:Boolean
 		public var active:Boolean
+		public static var EVENT_DEACTIVE:String="event_deactive"
+		public static var EVENT_ACTIVE:String="event_active"
 		/**
 		 * Don't get DeepLink Object from new DeepLink(),please use DeepLink.getInstance(),it will return a DeepLink Object.
 		 * @param	target
@@ -127,35 +132,38 @@ package com.ourbrander.deepLink
 			}
 			_history = [];
 			autoDeactive = false;
+			autoActive = false;
 			active = true;
 			ExternalInterface.addCallback("deeplink_onLinkChanged", deeplink_onLinkChanged);
 			ExternalInterface.addCallback("deeplink_onLinkOpened", deeplink_onLinkOpened);
 			
-		//	ExternalInterface.addCallback("deeplink_onBlur", onBlur);
-			//ExternalInterface.addCallback("deeplink_onFocus", onFocus);
-			//ExternalInterface.addCallback("deeplink_onFocus2", onFocus);
+			ExternalInterface.addCallback("deeplink_onBlur", onBlur);
+			ExternalInterface.addCallback("deeplink_onFocus", onFocus);
+			ExternalInterface.addCallback("deeplink_onFocus2", onFocus);
 			
 			
 		}
 		
 		protected function onFocus():void
 		{
-			if(autoDeactive){
-				//getFocus();
+			if(autoActive){
+				getFocus();
 			}
 		}
 		
 		protected function onBlur():void
 		{
-			if(autoDeactive){
-				//lostFocus();
-				trace("on blur!!")
+			
+			if (autoDeactive) {
+
+				lostFocus()
+				
 			}
 		}
 		/**@private
 		 * 
 		 */
-		protected function deeplink_onLinkOpened(value:String=""):void
+		protected function deeplink_onLinkOpened(value:String):void
 		{
 		 
 			var str:String = String(value).toLowerCase();
@@ -174,7 +182,7 @@ package com.ourbrander.deepLink
 		/**@private
 		 * 
 		 */
-		private   function deeplink_onLinkChanged(value:String=""):void {
+		private   function deeplink_onLinkChanged(value:String):void {
 			var str:String = String(value).toLowerCase();
 			var array:Array;
 			if (str.charAt(str.length - 1) == "/") {	str=str.substring(0,str.length-1)}
@@ -330,9 +338,9 @@ package com.ourbrander.deepLink
 		 * 	}
 		 * </listing>
 		 */
-		public function open(url:String, title:String = "", params:String = "",window:String="_blank"):void {
+		public function open(url:String, title:String = "", params:String = "",window:String="_blank",deactive:Boolean=true):void {
 		
-			if (autoDeactive!=true && window!="_self") 
+			if (autoDeactive!=true && deactive) 
 			{
 				lostFocus();
 			}
@@ -340,8 +348,9 @@ package com.ourbrander.deepLink
 				
 				navigateToURL(new URLRequest(url),window)
 			}else {
-				var a = ExternalInterface.call("window.open('" + url + "','" + title + "','" + params + "')");
+				var a:* = ExternalInterface.call("window.open('" + url + "','" + title + "','" + params + "').focus()");
 				//when swf play in stand player or not on web.
+				
 				if (String(a)=="null") {
 					navigateToURL(new URLRequest(url),window)
 				}
@@ -369,17 +378,16 @@ package com.ourbrander.deepLink
 		 * when autoDeactive=false, use this function to dispatch Deactive Event.
 		 */
 		public function lostFocus():void {
-			//trace("----------------------->lostFocus")
 				active=false
-				dispatchEvent(new Event(DeepLink.DEACTIVATE, true));
+				dispatchEvent(new Event(DeepLink.EVENT_DEACTIVE, true));
 		}
 		/**
 		 * when autoDeactive=false, use this function to dispatch Active Event.
 		 */
 		public  function getFocus():void {
-		 
+		
 			active = true;
-			dispatchEvent(new Event(Event.ACTIVATE, true));
+			dispatchEvent(new Event(DeepLink.EVENT_ACTIVE, true));
 		}
 		
 		

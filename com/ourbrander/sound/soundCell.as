@@ -1,5 +1,7 @@
 ﻿package com.ourbrander.sound 
 {
+ 
+	import com.ourbrander.debugKit.itrace;
 	import flash.events.Event;
 	import flash.events.EventDispatcher;
 	import flash.events.IOErrorEvent;
@@ -17,7 +19,7 @@
 		 * @author liuyi,if you want find more help doucment or anything else,you can visit my blog:www.ourbrander.com or send me email:contact@ourbrander.com
 	liuyi
 	 */
-	dynamic public class soundCell extends EventDispatcher
+	dynamic public class SoundCell extends EventDispatcher
 	{   
 		private var _hasSoundCard:Boolean=true
 		protected var _id:String
@@ -29,17 +31,20 @@
 		protected var _timer:Timer = new Timer(300, 0)
 		protected var _defultVolume:Number = 0.75
 		protected var _volume:Number  
-		protected var _puaseVolume:Number
+		protected var _pauseVolume:Number=-1
 		protected var _igoreState:Boolean = true
+		protected var _type:String
+		public static const TYPE_DEFALUT:String = "default";
+		public static const TYPE_EFFECT:String = "effect";
 		 
 		
-		public function soundCell($id:String="",$url:String="",$sound:Sound=null,$chanel:SoundChannel=null) 
+		public function SoundCell($id:String="",$url:String="",$sound:Sound=null,$chanel:SoundChannel=null,type:String="default") 
 		{
 			 
 			init($id,$url,$sound,$chanel)
 		}
 		
-		private function init ($id:String = "", $url:String = "", $sound:Sound = null, $chanel:SoundChannel = null)  {
+		private function init ($id:String = "", $url:String = "", $sound:Sound = null, $chanel:SoundChannel = null,$type:String="default"):void  {
 			 
 			if (Capabilities.hasAudio==false) {
 				_hasSoundCard=false
@@ -60,19 +65,30 @@
 			}
 			
 		    _timer.addEventListener(TimerEvent.TIMER, timerHappend)
-			_volume = 0;
-			 
-			 
+			
+			type = $type;
+			if(type==TYPE_DEFALUT)
+				defultVolume = SoundManager.defaultVolume
+			else if (type == TYPE_EFFECT) defultVolume = SoundManager.effectVolume
+			_volume = defultVolume;
 		}
 		
-		public function set id($id:String) {
+		public function get type():String {
+			return _type
+		}
+		
+		public function set type(t:String):void {
+			_type = t;
+		}
+		
+		public function set id($id:String):void {
 			this._id=$id
 		}
 		public function get id():String {
 			return _id
 		}
 		
-		private function set url($url:String) {
+		private function set url($url:String) :void{
 			if ($url!="") {
 				this._url=$url
 			}
@@ -82,9 +98,9 @@
 			return this._url
 		}
 		
-		public function set sound($sound:Sound) {
+		public function set sound($sound:Sound) :void{
 			 if (_hasSoundCard==false) {
-				 return false
+				 return 
 			 }
 			
 			_sound = $sound
@@ -105,7 +121,7 @@
 			return _playing
 		}
 		
-		public function set defultVolume(vol:Number) {
+		public function set defultVolume(vol:Number):void {
 			if (vol<0) {
 				_defultVolume=0
 			}else if(vol>1){
@@ -118,7 +134,7 @@
 		public function get defultVolume():Number {
 			return 	_defultVolume
 		}
-		public function set chanel ($chanel:SoundChannel) {
+		public function set chanel ($chanel:SoundChannel) :void{
 	 
 				
 				if (_chanel != null) {
@@ -130,17 +146,17 @@
 				}
 				
 				_chanel = $chanel
+				if(_chanel!=null)
 				_chanel.addEventListener(Event.SOUND_COMPLETE, completed);
 			 
 		}
 		
 		public function get chanel():SoundChannel {
-			
-			var k = _chanel
-			return k
+ 
+			return _chanel
 		}
 		
-		public function set pausePosition(position:Number) {
+		public function set pausePosition(position:Number) :void{
 			_pausePosition=position
 		}
 		
@@ -148,14 +164,10 @@
 		
 			return _pausePosition
 		}
-		public function set volume(v:Number) {
+		public function set volume(v:Number):void {
 			  
-			if (v > 1) {
-				v=1
-			}
-			if (v < 0) {
-				v=0
-			}
+			if (v > 1) v=1
+			if (v < 0)v=0
 			
 			_volume = v
 			if (_chanel != null) {
@@ -174,106 +186,54 @@
 				return _volume
 			}
 		}
-		public function puase() {
+		public function pause() :void{
 			  
-			 try {
-				
-				if (_playing == true) {
-					_playing = false;
-					 pausePosition = chanel.position;
-					 _puaseVolume = _chanel.soundTransform.volume;
+		 
+			_playing = false;
+			if (_chanel !=null) {
+				 pausePosition = chanel.position;
+				 _pauseVolume = _chanel.soundTransform.volume;
+				  chanel.stop();
+				 
+			}
+			 chanel=null
+		}
+		public function stop():void {
+			 
+			    _playing == false
+				 if(_chanel!=null){
+					 pausePosition =0
+					 _pauseVolume=_chanel.soundTransform.volume
 					 chanel.stop();
-					 
-				}
-			 }catch (e) {
-				 trace(_id+" sound cell puase error:"+e)
-			 }
-		}
-		public function stop() {
-			 
-			 
-			 try {
-				 if(chanel!=null){
-					if (_playing == true) {
-						_playing = false
-						 pausePosition =0
-						 _puaseVolume=_chanel.soundTransform.volume
-						 chanel.stop()
-						  
-					}else {
-						 
-						 pausePosition =0
-						 _puaseVolume=_chanel.soundTransform.volume
-						 chanel.stop()
-					}
 				 }
-			 }catch (e) {
-				 trace(_id+" sound cell stop error:"+e)
-			 }
+			 chanel=null
 		}
-		public function play($positon:Number=-1,$loop:int=0,$sndTransform:SoundTransform=null,igoreState:Boolean=true) {
-		     checkSoundState()
-			 try{
+		public function play($positon:Number=-1,$loop:int=0,$sndTransform:SoundTransform=null):void {
+		   //  checkSoundState()
+		   //  if(_chanel!=null)
+			// itrace(_id+":   "+chanel.soundTransform.volume.toString(),"_playing"+_playing+"  chanel.position:"+chanel.position.toString())
+			//	if (_playing && ($positon < 0)) return 
 				if (_playing == false) {
-				 	
-					_playing = true;
-					
-					 pausePosition=($positon<0)?pausePosition:$positon
-					 chanel = sound.play(pausePosition, $loop, $sndTransform)
-					// volume = (isNaN(_puaseVolume))?_volume:_puaseVolume
-					if (isNaN(_puaseVolume)) {
-					 
-						if ($sndTransform == null) {
-							
-						 
-						
-							volume = _defultVolume;
-						}else {
-								 
-							volume=$sndTransform.volume
-						}
-					}else {
-					 
-						volume=_puaseVolume
-					}
-					
-				}else if (igoreState == true) {
-					 
-					_playing = true
-					
-					pausePosition=($positon<0)?pausePosition:$positon
-					chanel = sound.play(pausePosition, $loop, $sndTransform)
-					if (isNaN(_puaseVolume)) {
-					 
-						if ($sndTransform == null) {
-							
-						 
-						
-							volume=_volume
-						}else {
-							 
-							volume=$sndTransform.volume
-						}
-					}else {
-							 
-						volume=_puaseVolume
-					}
-					
-					/*if($sndTransform==null){
-						volume = (isNaN(_puaseVolume))?_volume:_puaseVolume
-					}*/
-				}else if(igoreState==false) { 
-					//	trace("warn:"+_id+" are playing.you can't play it again!")
+					pausePosition=($positon<0)?pausePosition:$positon	
+				}else if(_chanel!=null) {
+					pausePosition = chanel.position
+					pausePosition = ($positon < 0)?pausePosition:$positon;
 				}
-			 }catch (e) {
-				 trace("sound cell play error:" + e);
-				 	_playing = false;
-			 }
+				
+			_playing = true;
+			 chanel = sound.play(pausePosition, $loop, $sndTransform);
+	
+			if (_pauseVolume<0) {
+				if ($sndTransform == null)  volume=_defultVolume	
+				 else volume=$sndTransform.volume
+			}else {
+				volume=_pauseVolume
+			}
 			  
 		}
 		public function checkSoundState() :void{
 			 
-			return ;
+			 return;
 			var timer:Timer = new Timer(50, 1)
 			 
 			try {
@@ -284,77 +244,57 @@
 				}else {
 					_playing=false
 				}
-			}catch (e) {
+			}catch (e:Error) {
 				// trace("checkSoundState:"+e)
 			}
 			 
-				 function checkSoundResult() {
-					  
+				 function checkSoundResult() :void{
 					timer.stop()
-					 
 					timer.removeEventListener(TimerEvent.TIMER, checkSoundResult)
-					 
-					if (soundPosition!=chanel.position) {
-							_playing=false
-					}else {
-							_playing=true
-					}
+					if (soundPosition!=chanel.position) _playing=false	
+					else _playing=true					
 				 
 				}//end function
 			
 		
 		}//end function
 		
-		public function close() {
-			 if (_hasSoundCard==false) {
-				 return false
-			 }
-			if (_url != "") {
-				_sound.close()
-				
-			}
-			
+		public function close() :void{
+			 if (_hasSoundCard==false)  return  
+			if (_url != "") _sound.close()
+
 		}
 		
 		
-		public function destory() {
+		public function destory():void {
 			_sound = null
 			_chanel = null
-			 
-			 
+	
 		}
 		public function get bytesLoaded():Number {
-			if (_sound != null) {
-				return _sound.bytesLoaded
-			}
+			if (_sound != null) return _sound.bytesLoaded
 			
 			return 0;
 		}
 		
 		public function get bytesTotal():Number {
-			if (_sound != null) {
-				return _sound.bytesTotal
-			}
+			if (_sound != null) return _sound.bytesTotal
 			return 0;
 		}
 		
 		public function get position():Number {
-			if (_chanel != null) {
-				return _chanel.position;
-			}
+			if (_chanel != null) return _chanel.position;
 			return 0;
 			
 		}
 		
 		public function get duration():Number {
-			if (_sound != null) {
-				return _sound.length
-			}
+			if (_sound != null) return _sound.length
 			
 			return 0;
 		}
 		
-		private function completed(e:Event) {
+		private function completed(e:Event):void {
 			 _pausePosition = 0
 			_playing = false;
 			
@@ -362,20 +302,16 @@
 		
 		}
 		
-		private function timerHappend(e:TimerEvent) {
+		private function timerHappend(e:TimerEvent) :void{
 			try{
-				if(chanel.soundTransform.volume<=0||chanel.soundTransform.volume>=_defultVolume){
-					_timer.stop()
-				}
-			}catch (event) {
+				if(chanel.soundTransform.volume<=0||chanel.soundTransform.volume>=_defultVolume) _timer.stop()
+			}catch (e:Error) {
 				
 			}
 		}
 		
-		private function loadSound() {
-			 if (_hasSoundCard==false) {
-				 return false
-			 }
+		private function loadSound() :void{
+			 if (_hasSoundCard==false)  return  
 			if (_url!=null) {
 				_sound.addEventListener(Event.COMPLETE,soundLoaded)
 				_sound.addEventListener(IOErrorEvent.IO_ERROR, loadError)
@@ -384,12 +320,11 @@
 			}
 		}
 		
-		private function soundLoaded(e:Event) {
-			//trace("soundLoaded:")
-			//chanel=_sound.play()
+		private function soundLoaded(e:Event):void {
+		 
 			dispatchEvent(new Event(Event.COMPLETE,true));
 		}
-		private function loadError(e:IOErrorEvent) {
+		private function loadError(e:IOErrorEvent) :void{
 			trace("sound cell loadError:\n"+e+"\n url:"+_url)
 		}
 		

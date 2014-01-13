@@ -15,7 +15,7 @@ package com.ourbrander.net
 	import flash.events.TimerEvent
 	public class Request
 	{
-		public static  var OUTTIME:Number = 15000;
+		public static  var OUTTIME:Number = 5000;
 		public function Request() 
 		{
 			

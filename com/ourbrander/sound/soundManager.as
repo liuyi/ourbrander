@@ -1,7 +1,7 @@
 ﻿package com.ourbrander.sound 
 {
  
-	import com.ourbrander.sound.soundEvent
+	import com.ourbrander.sound.SoundEvent
 	import flash.events.Event;
 	import flash.events.EventDispatcher;
 	import flash.media.Sound
@@ -17,231 +17,216 @@
 	liuyi
 	update function setVolume date:2010/07/09
 	 */
-	dynamic public class soundManager extends EventDispatcher
+	dynamic public class SoundManager extends EventDispatcher
 	{
 		private var _allowPlay:Boolean = true
-		private var _soundArr:Array = new Array()
+		private var _sounds:Vector.<SoundCell> 
 		private var _mute:Boolean
-		private static var _soundManager:soundManager
-		private var _videoSound:Boolean=false
-		public function soundManager() :void
+		private static var _soundManager:SoundManager
+		private var _videoSound:Boolean = false
+		public static var effectVolume:Number = 1;
+		public static var defaultVolume:Number=0.7
+		public function SoundManager() :void
 		{
 			//trace("init soundManager")
-			if (soundManager._soundManager != null) {
-				return 
-			}
+			if (SoundManager._soundManager != null) return 
 			_soundManager = this;
 			_mute = false;
+			_sounds = new Vector.<SoundCell>();
 		}
 		
-		public static function getInstance():soundManager {
+		public static function getInstance():SoundManager {
 			
-			if(_soundManager==null){
-				return new soundManager();
-			}else {
-				return _soundManager;
-			}
+			if(_soundManager==null) new SoundManager();
+		
+			return _soundManager;
+			
 		}
 	
-		public function init() {
-			
-		}
-		public function playSound($id:String="", $positon:Number = -1, $loop:int = 0, $sndTransform = null,igoreState:Boolean=true) {
+		 
+		public function playSound($id:String="", $positon:Number = -1, $loop:int = 0, $sndTransform:SoundTransform = null) :void{
 			var default_sndTransform:SoundTransform;
 			if ($sndTransform == null) {
-					if (_mute==false) {
-						default_sndTransform=new SoundTransform(0.75)
-					}else {
-						default_sndTransform=new SoundTransform(0)
-					}
-					
-				}else {
-						default_sndTransform=$sndTransform
-					if (_mute==true) {
-						default_sndTransform.volume=0
-					}
-				
+				if (_mute) default_sndTransform = new SoundTransform(0);
+			}else {
+				default_sndTransform=$sndTransform
+				if (_mute) default_sndTransform.volume=0
 			}
 				
 			if ($id!="") {
-				var sound_cell:soundCell = getSoundById($id)
-				if (sound_cell == null ) {
-						return 
-				}
-				if (sound_cell.isPlaying == false) {
-						sound_cell.play($positon, $loop, default_sndTransform, igoreState)
-				}else if(sound_cell.isPlaying == true ) {
-					if(igoreState==false){
-						trace("sound manager playSound:sound is playing ,can not start it,because igoreState is false.")
-					}else {
-						sound_cell.play($positon, $loop, default_sndTransform, igoreState)
-					}
-				}
+				var cell:SoundCell = getSoundById($id)
+				if (cell == null ) throw new Error("playSound: can not find this sound:"+$id); 
+				    cell.play($positon, $loop, default_sndTransform)
+				
 			}else {
-				 for each(var cell in _soundArr) {
-					 cell.play($positon,$loop,default_sndTransform,igoreState)
-					 
-				 }
+				 for each( cell in _sounds) 
+					 cell.play($positon,$loop,default_sndTransform)
+				 
 			}
 		}
 		
-		public function stopSound($id:String = "") {
+		public function stopEffect(fade:Number=0.6):void {
+			 for each( var cell:SoundCell  in _sounds) {
+				 if(cell.type==SoundCell.TYPE_EFFECT)
+					 TweenLite.to(cell, fade, { volume:0, onComplete:onComplete, onCompleteParams:[cell] } );
+			 }
+			function onComplete(target:SoundCell):void {
+				target.stop();
+			}
+		}
+		
+		public function stopSound($id:String = "",fade:Number=0.6):void {
 		 
 			if($id!=""){
-				  var sound_cell:soundCell = getSoundById($id)
-				 if (sound_cell == null ) {
-					 
-					 return 
-				 }
-				 
-				 sound_cell.stop()
+				var cell:SoundCell = getSoundById($id);
+				if (cell == null ) throw new Error("stopSound: can not find this sound:" + $id); 
+				if (fade == 0) cell.stop();
+				else 
+				TweenLite.to(cell, fade, { volume:0,onComplete:onComplete,onCompleteParams:[cell] } );
+			
 			}else {
-				 for each(var cell in _soundArr) {
-					 cell.stop()
-					 
+				 for each( cell in _sounds) {
+					 if (fade == 0) cell.stop()
+					 else
+					     TweenLite.to(cell, fade, { volume:0, onComplete:onComplete, onCompleteParams:[cell] } );
 				 }
 			}
+			
+			function onComplete(target:SoundCell):void {
+				target.stop();
+			}
+			 
 		}
 		
-		public function puaseSound($id:String = "") {
+		
+		
+		public function pauseSound($id:String = "",fade:Number=0.6):void {
 			 
 			if($id!=""){
-				var sound_cell:soundCell = getSoundById($id)
-					 if (sound_cell == null ) {
-						  
-							 return 
-					 }
-					 
-					sound_cell.puase()
+				var cell:SoundCell = getSoundById($id);
+				if (cell == null ) throw new Error("pauseSound: can not find this sound:"+$id); 
+				TweenLite.to(cell, fade, { volume:0,onComplete:onComplete,onCompleteParams:[cell] } );
 			}else {
-					 for each(var cell in _soundArr) {
-					 cell.puase()
-					}
+				for each( cell  in _sounds)  TweenLite.to(cell, fade, { volume:0,onComplete:onComplete,onCompleteParams:[cell] } );
+			}
+			
+			function onComplete(target:SoundCell):void {
+				target.pause();
 			}
 		}
 		
-		public function closeSound($id:String = "") {
+		public function closeSound($id:String = "",fade:Number=0.6):void {
 			if ($id != "") {
 				
-				var sound_cell:soundCell = getSoundById($id)
-					 if (sound_cell == null ) {
-							 return 
-					 }
-					sound_cell.close()
+				var cell:SoundCell = getSoundById($id);
+					if (cell == null ) throw new Error("closeSound: can not find this sound:"+$id); 
+				TweenLite.to(cell, fade, { volume:0,onComplete:onComplete,onCompleteParams:[cell] } );
 			}else {
-				 for each(var cell in _soundArr) {
-					 cell.close()
-					}
+				 for each( cell  in _sounds) TweenLite.to(cell, fade, { volume:0,onComplete:onComplete,onCompleteParams:[cell] } );
+					
+			}
+			
+			function onComplete(target:SoundCell):void {
+				target.close();
 			}
 		}
 		 
-		public function removeSound($id:String = "") {
+		public function removeSound($id:String = ""):void {
 			 if ($id != "") {
-				 var sound_cell:soundCell = getSoundById($id)
-					 if (sound_cell == null ) {
-							 return 
-					 }
-					sound_cell.destory()
+				 var cell:SoundCell = getSoundById($id)
+					 if (cell == null )  return 
+					cell.destory()
 			 }else {
-				 for each(var cell in _soundArr) {
-					 cell.destory()
-					}
+				 for each( cell in _sounds)  cell.destory()
 			 }
 		}
 		
-		public function setVolume(value:Number, $id:String = "",fade:Number=0.6) {
-			if (mute==true || videoSound==true) {
-				value=0
-			}
+		public function setVolume(value:Number, $id:String = "",fade:Number=0.6):void {
+			if (mute==true || videoSound==true) 	value=0
 		    if($id!=""){
-				var sound_cell:soundCell = getSoundById($id)
-				 if (sound_cell == null ) {
-					 return 
-				 }
-				 //sound_cell.volume = value
-				 TweenLite.to(sound_cell,fade,{volume:value})
+				var cell:SoundCell = getSoundById($id)
+				 if (cell == null )  return 
+				 TweenLite.to(cell,fade,{volume:value})
 			}else {
-				 for each(var cell in _soundArr) {
-					// cell.volume=value
-					 TweenLite.to(cell, fade, { volume:value } )
-			
-				 }
+				 for each( cell  in _sounds)  TweenLite.to(cell, fade, { volume:value } )
 				 
 			}
 			
 		}
 		
 		//@come soon!
-		public function offsetVolume(value:Number) {
+		public function offsetVolume(value:Number) :void{
 			
 		}
 		
-		public function set  mute(b:Boolean) {
-		 	trace("set mute",b)
-			 
+		public function set  mute(b:Boolean):void {
 			_mute = b;
 		}
 		public function get mute():Boolean {
-			//	trace("get mute",_mute)
 			return _mute;
 		}
 		
 		public function set videoSound(b:Boolean):void {
 			_videoSound = b
-			dispatchEvent(new soundEvent(soundEvent.VIDEO_PLAYING))
+			dispatchEvent(new SoundEvent(SoundEvent.VIDEO_PLAYING))
 		}
 		
 		public function get videoSound():Boolean {
 			return _videoSound
 		}
 		
+		public function isPlaying($id:String):Boolean {
+			var cell:SoundCell = getSoundById($id);
+			if (cell == null || !cell.isPlaying) return false
+			else if (cell.isPlaying) return true
+			return false;
+		}
+		
 	 
-		public function getSoundById($id:String):soundCell {
-			var _cell:soundCell = null
-		 
-			 for (var i = 0; i < _soundArr.length; i++ ) {
-				 var cell:soundCell = _soundArr[i] as soundCell
+		public function getSoundById($id:String):SoundCell {
+			
+		  var cell:SoundCell
+			 for (var i :uint= 0; i < _sounds.length; i++ ) {
+				cell = _sounds[i] as SoundCell
 			 
-					if (cell.id == $id) {
-						_cell = cell
-					 
-						return _cell
-					}
+				if (cell.id == $id) return cell
 			 }
 		 
-			 return _cell
+			 return cell
 		 
 		}
 		
-		public function addSoundByClass($id:String,classname:String) {
+		public function get sounds():Vector.<SoundCell> {
+			return _sounds
+		}
+		
+	 
+		
+		public function addSoundByClass($id:String,classname:String,type:String="default") :void{
 		//	trace("classname:" + classname + "   id:" + $id)
 			var soundClass:Class = getDefinitionByName(classname)  as  Class
 			var sound:Sound=new soundClass()
-		    var sound_cell:soundCell = new soundCell($id)
+		    var sound_cell:SoundCell = new SoundCell($id,"",null,null,type)
 			sound_cell.sound = sound
-			_soundArr.push(sound_cell)
+			_sounds.push(sound_cell)
 			
 			
 		}
 		
-		public function addSoundByPath($id:String,link:String) {
+		public function addSoundByPath($id:String,link:String,type:String="default") :void{
 			var sound:Sound=new Sound()
-		    var sound_cell:soundCell = new soundCell($id, link, sound)
-			_soundArr.push(sound_cell)
+		    var sound_cell:SoundCell = new SoundCell($id, link, sound,null,type)
+			_sounds.push(sound_cell)
 		}
 		
-		public function addSoundByObj($id,target:Sound):void {
-			  var sound_cell:soundCell = new soundCell($id, "", target);
-			  _soundArr.push(sound_cell)
+		public function addSoundByObj($id:String,target:Sound,type:String="default"):void {
+			  var sound_cell:SoundCell = new SoundCell($id, "", target,null,type);
+			  _sounds.push(sound_cell)
 		}
 		
-		public function addSoundByStream($id:String,sd:Sound,sc:SoundChannel=null) {
-			
-		}
+	 
 		
-		private function setSoundChanel($id:String) {
-			
-		}
+		 
 		
 		
 		

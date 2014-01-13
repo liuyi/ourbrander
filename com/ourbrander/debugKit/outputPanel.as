@@ -1,6 +1,7 @@
 ﻿package com.ourbrander.debugKit 
 {
 
+	import com.ourbrander.components.scrollBar.TextScrollBar;
 	import flash.display.MovieClip;
 	import flash.display.SimpleButton;
 	import flash.display.Sprite;
@@ -9,7 +10,8 @@
 	import flash.events.MouseEvent;
 	import flash.text.TextField;
 	import flash.events.KeyboardEvent
-	import com.ourbrander.webObj.component.scrollBar.textScrollbar
+
+	import flash.ui.Keyboard;
 	
 	
 	/**
@@ -28,7 +30,7 @@
 		private var offsetX:Number = 10
 		private var offsetY:Number = 20
 		private static var _str:String = ""
-		private var _textScrollbar:textScrollbar
+		private var _textScrollbar:TextScrollBar
 		
 		private var _clear_mc:MovieClip
 		 
@@ -42,7 +44,7 @@
 			 }
 		}
 		
-	    private  function init() {
+	    private  function init():void {
 		 
 			 this.visible=false
 			outputPanel.obj = this
@@ -50,13 +52,13 @@
 			 initDisplayPanle()
 		}
 		
-		private function addtoStage(e:Event) {
+		private function addtoStage(e:Event):void {
 			stage.addEventListener(KeyboardEvent.KEY_DOWN, KeyboardEventHandler)
 			_bg.addEventListener(MouseEvent.MOUSE_DOWN, bgPressDown)
 			_bg.addEventListener(MouseEvent.MOUSE_UP, bgRelease)
-			_clear_mc.addEventListener(MouseEvent.MOUSE_DOWN,clear)
+			//_clear_mc.addEventListener(MouseEvent.MOUSE_DOWN,clear)
 		}
-		private function removefromStage(e:Event) {
+		private function removefromStage(e:Event) :void{
 			removeEventListener(Event.ADDED_TO_STAGE,addtoStage)
 			stage.removeEventListener(KeyboardEvent.KEY_DOWN, KeyboardEventHandler)
 			_bg.removeEventListener(MouseEvent.MOUSE_DOWN, bgPressDown)
@@ -66,7 +68,7 @@
 			var m = new outputPanel()
 			
 		}*/
-		private function initDisplayPanle() {
+		private function initDisplayPanle() :void{
 			_bg.graphics.beginFill(0x000000,0.6)
 			_bg.graphics.drawRect(0, 0, _width, _height)
 		   _bg.width = _width
@@ -95,15 +97,15 @@
 			this.addChild(_clear_mc)
 		}
 		 
-		private function updateDisplayPanle() {
-			var w=_bg.width - offsetX*2
-		   var h=_bg.height - offsetY*2
+		private function updateDisplayPanle():void {
+			var w:int=_bg.width - offsetX*2
+		   var h:int=_bg.height - offsetY*2
 		   _txt.width =( w>0)?w:0
 		   _txt.height = ( h>0)?h:0
 		   _txt.x = offsetX
 		   _txt.y=offsetY
 		}
-		private function initScrollbar() {
+		private function initScrollbar():void {
 			var dragMc:MovieClip = new MovieClip()
 			dragMc.name = "dragMc"
 			
@@ -133,7 +135,7 @@
 			skin.addChild(upBtn)
 			skin.addChild(downBtn)
 			
-			_textScrollbar=new textScrollbar(_txt)
+			_textScrollbar=new TextScrollBar(_txt)
 			_textScrollbar.setInterface(skin)
 			_textScrollbar.x = _bg.width
 			_textScrollbar.y = _bg.y
@@ -141,42 +143,44 @@
 		   addChild(_textScrollbar)
 		}
 		 
-		public  function show() {
+		public  function show() :void {
+		
+			if (!debug.enabled) return;
 			if (outputPanel._obj == null) {
 				init()
 			}
 		 
 			updateDisplayPanle()
-			
+			this.parent.addChild(this);
 			this.visible = true
 			_beshow=true
 		}
-		public  function hide() {
+		public  function hide():void {
 		 
 			 this.visible=false
 			_beshow=false
 		}
 		
 		
-		private function KeyboardEventHandler(e:KeyboardEvent) {
+		private function KeyboardEventHandler(e:KeyboardEvent) :void{
 			var key:uint=e.keyCode
 			var ctrl:Boolean=e.ctrlKey
 			var shift:Boolean = e.shiftKey
 			//com.ourbrander.debug.itrace(key)
 			//77="m" 67="c"
 		//	_txt.appendText(ctrl+"/"+shift+"/"+key+"\n")
-			if (ctrl == true && shift == true &&  key == 77) {
+			if (key == Keyboard.O) {
 			
 				toggleState()
 			}
-			if (ctrl == true && shift == true && key == 67) {
+			if (key == Keyboard.C) {
 			
 				outputPanel.clear()
 			}
 			
 		}
 		
-		private function toggleState() {
+		private function toggleState():void {
 			if (_beshow==true) {
 				hide()
 			}else {
@@ -185,31 +189,31 @@
 		}
 	
 		
-		public function addText($str:String="") {
+		public function addText($str:String="") :void{
 			_txt.appendText($str)
 		}
-		public function setText($str:String) {
+		public function setText($str:String) :void{
 			_txt.text=$str
 		}
 		
 		
-		private function bgPressDown(e:MouseEvent) {
+		private function bgPressDown(e:MouseEvent) :void{
 			this.startDrag()
 		}
-		private function bgRelease(e:MouseEvent) {
+		private function bgRelease(e:MouseEvent):void {
 			this.stopDrag()
 		}
-	   private  static function set  obj(o:outputPanel) {
+	   private  static function set  obj(o:outputPanel) :void{
 			_obj=o
 		}
 		private static function get obj():outputPanel {
-			var k = _obj 
-			return k
+		
+			return _obj
 		}
-		public static function dtrace(... object) {
-			 
+		public static function dtrace(... object):void {
+			 if (!debug.enabled) return;
 			 var s:String=""
-			for (var i in object) {
+			for (var i:* in object) {
 		 
 				
 					 if (object[i] is String) {
@@ -225,7 +229,7 @@
 			_obj.addText(s+"\n") 
 		}
 		
-		public static function clear(e=null) {
+		public static function clear(e:Event=null) :void{
 			_str=""
 			_obj.setText("")
 		}

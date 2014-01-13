@@ -18,7 +18,6 @@
 		private var _bytesLoaded:Number;//size of loaded content
 		private var _bytestTotal:Number;//size of content
 		private var _status:String;//the status of this item's content.if loaded or load FAULT and just ready. four vaule:loading,loaded,FAULT,ready. 
-		private var _loader
 		
 		/**
 		 * Create a new LoadItem Object.Generally,user don't need create LoadItem object for easyLoader.it will create LoadItem Object from config file or the function "addFile()"
@@ -91,6 +90,7 @@
 		}
 		/** @private */
 		internal function setBytesTotal(num:Number):void {
+		
 			_bytestTotal=num;
 		}
 

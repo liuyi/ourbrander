@@ -2,6 +2,7 @@
 package com.ourbrander.loader{
 
 
+ 
 	import flash.display.Loader;
 	import flash.events.Event;
 	import flash.events.EventDispatcher;
@@ -14,18 +15,19 @@ package com.ourbrander.loader{
 	import flash.net.NetConnection;
 	import flash.net.NetStream;
 	import flash.net.URLLoader;
+	import flash.net.URLLoaderDataFormat;
 	import flash.net.URLRequest;
+	import flash.net.URLStream;
 	import flash.net.URLVariables;
+	import flash.system.ApplicationDomain;
 	import flash.system.LoaderContext;
 	import flash.system.SecurityDomain;
 	import flash.utils.Timer;
-	import flash.net.URLLoaderDataFormat;
-	import com.ourbrander.loader.EasyLoaderEvent;
-	import com.ourbrander.loader.LoadItem;
-	import flash.system.ApplicationDomain
+	import flash.utils.getTimer;
 	/**
 	 * update:2010/7/1:videoload()  added:client.onMetaData =function (d:object):void{}
 	 * update:2011/6/28 itemLoad();
+	 *  update:2012/2/15 _index=-1;
 	 * itemLoad changed, add if no file type , can use method instead of filetype. such as  get a image from facebook:
 	 * link:http://graph.facebook.com/{id}/picture?type=square
 	 * _loader.addFile(link, "thumb","",false,"image");//can set the method to "image".
@@ -110,7 +112,7 @@ package com.ourbrander.loader{
 		//if ignore load error to download next file.
 		private var _ignoreError:Boolean;
 		//index of current file according to  xml childs number
-		private var _index:uint;
+		private var _index:int;
 		//types of  files,let preloader know how to download them.user can add custom file type with function addType()
 		private var _typeList:Array;
 		
@@ -122,6 +124,8 @@ package com.ourbrander.loader{
 		private var _id:String;
 		
 		public static var isLocal:Boolean = true;
+		public var autoGetSize:Boolean = true
+		public var onGetSize:Function
 		
 		/* can regist an easyloader instance to Easyloader classes, so other class can get it by id or alias.
 		 * */
@@ -268,9 +272,10 @@ package com.ourbrander.loader{
 		 * </listing>
 		 */
 		public function EasyLoader() :void {
- 
+			
 			initType();
 			reset();
+		
 		}
 		
 		/*can get easyloader intance by id*/
@@ -279,7 +284,7 @@ package com.ourbrander.loader{
 			
 			var len:uint = _instanceList.length;
 			for (var i:uint = 0; i < len; i++ ) {
-				trace("Easyloader instance id:"+_instanceList[i].id)
+			
 				if (_instanceList[i].id == id) return _instanceList[i];
 			}
 			
@@ -327,28 +332,36 @@ package com.ourbrander.loader{
 		 * @param $ignoreError:
 		 * @default true true or false,suggest set to true.once this params set to false,when easyLoader meet a error,it will puase download assets.
 		 * */
-		public function init(obj:*=null,$autoLoad:Boolean=true,$ignoreError:Boolean=true):Boolean {
+		public function init(obj:Object=null,$autoLoad:Boolean=true,$ignoreError:Boolean=true):void {
 
 
 			_autoLoad=$autoLoad;
 			_ignoreError=$ignoreError;
-			if (obj!=null) {
-				if (obj is String) {
-					loadCofingXML(obj);
-					return true;
-				} else if (obj is XML) {
-					_xml=obj;
-					configLoaded();
-					return true;
-				} else {
-					throw new Error("incorrect config file type");
-					return false;
+			if (obj == null)  return 
+			
+			if (obj is String) {
+				loadCofingXML(obj as String);
+				
+			} else if (obj is XML) {
+				_xml=obj as XML;
+				configLoaded();
+				 
+				
+			} else if (obj is XMLList) {
+				if (obj[0].hasChildNodes) {_xml = obj[0] as XML}
+				else{
+					_xml = new XML(<assets></assets>);
+					_xml.appendChild(obj as XMLList)
 				}
+				 
+				configLoaded();
+				
+				
 			} else {
-				return true;
+				throw new Error("incorrect config file type");
+				
 			}
-
-
+			 
 		}
 
 		/** The number of bytes in the config file   */
@@ -405,7 +418,7 @@ package com.ourbrander.loader{
 			if ($name.charAt(0)!='.') {
 				return false;
 			} else {
-				for (var i:* in _typeList) {
+				for (var i:Object in _typeList) {
 					if (_typeList[i]['name']==$type) {
 
 						_typeList[i]['list']+=$name;
@@ -461,12 +474,21 @@ package com.ourbrander.loader{
          * Start loading progress
          */
 		public function start():void {
+	
 			if (_loaderStatus!=LOADING_PROGRESS) {
 				_loaderStatus=LOADING_PROGRESS;
+					 
 				initLoadItems();
 				itemLoad();
+					
+				
+					 	
+					 
+				
 			}
 		}
+		
+		
 
 		private function initLoadItems() :void{
 
@@ -478,10 +500,10 @@ package com.ourbrander.loader{
 					
 					var fname:String=getName(fpath);
 					var ftype:String=getType(fpath);
-					var falias:String=_xml.child(i).@alias;
-					var finfo:String=_xml.child(i).@info;
+					var falias:String=String(_xml.child(i).@alias);
+					var finfo:String=String(_xml.child(i).@info);
 					var fautoRemove:Boolean=_xml.child(i).@autoRemove=="true"?true:false;
-					var fmethod:String = _xml.child(i).@method;
+					var fmethod:String =String( _xml.child(i).@method);
 				 
 				 
 					var item:LoadItem=new LoadItem(null,fname,i,fpath,falias,ftype,finfo,fautoRemove,fmethod);
@@ -489,9 +511,16 @@ package com.ourbrander.loader{
 					item.setBytesTotal(0);
 					_loadList.push(item);
 				}//end for
+				
+				if(!autoGetSize)
+					_filesBytesTotal = (_xml.@total == null  || _xml.@total == "")?0:Number(_xml.@total);
+				else
+					 caculateSize();
 
 				_xml = null
 			}
+			
+		
 		}
         
 		/**
@@ -568,7 +597,7 @@ package com.ourbrander.loader{
 			}
 			try {
 				_urlLoader.close();
-			} catch (e:*) {
+			} catch (e:Error) {
 
 			}
 
@@ -698,25 +727,25 @@ package com.ourbrander.loader{
 		 * </listing>
 		 */
 		public function get filesBytesTotal():Number {
-			var n:Number=_filesBytesTotal
-			return  n;
+		 
+			return  _filesBytesTotal;
 		}
 		
 		/**
 		 * return the loaded  bytes of all files.
 		 */
 		public function get filesBytesLoaded():Number {
-			if (_loadList == null) { return 0 } else {
-				if (_loadList.length <= 0) { return 0 } else {
-					if( _loadList[index].status==EasyLoader.ITEM_STATUS_PROGRESS){
-						return _filesBytesLoaded + _loadList[index].bytesLoaded;
-					}else if( _loadList[index].status==EasyLoader.ITEM_STATUS_COMPLETED) {
-						return _filesBytesLoaded ;
-					}else {
-						return _filesBytesLoaded ;
-					}
-				}
+			if (_loadList == null || _loadList.length <= 0) return 0 
+	 
+			if( _loadList[index].status==EasyLoader.ITEM_STATUS_PROGRESS){
+				return _filesBytesLoaded + _loadList[index].bytesLoaded;
+			}else if( _loadList[index].status==EasyLoader.ITEM_STATUS_COMPLETED) {
+				return _filesBytesLoaded ;
+			}else {
+				return _filesBytesLoaded ;
 			}
+			 
+			
 		}
 		
 		
@@ -735,7 +764,7 @@ package com.ourbrander.loader{
 			} else {
 				try {
 					_urlLoader.close();
-				} catch (e:*) {
+				} catch (e:Error) {
 				}
 			}
 			_urlLoader.addEventListener(Event.COMPLETE,configLoaded);
@@ -752,7 +781,7 @@ package com.ourbrander.loader{
 			} else {
 				try {
 					_urlLoader.close();
-				} catch (e:*) {
+				} catch (e:Error) {
 
 				}
 			}
@@ -764,7 +793,8 @@ package com.ourbrander.loader{
 			_ignoreError=true;
 			_loaderStatus = FREE;
 			_filesBytesLoaded = 0;
-			_filesBytesTotal =int.MAX_VALUE;
+			_filesBytesTotal = int.MAX_VALUE;
+			_index = -1;
 			
 		}
 
@@ -775,16 +805,22 @@ package com.ourbrander.loader{
 			dispatchEvent(e);
 		}
 		private function configLoaded(e:Event=null):void {
+		
+	
 			if (e!=null) {
 				_xml=new XML(_urlLoader.data);
 			}
+		 
+			_filesBytesLoaded = 0;
+			_filesBytesTotal = int.MAX_VALUE;
+			_index ++;
+			
+			
 			_urlLoader.removeEventListener(Event.COMPLETE,configLoaded);
 			_urlLoader.removeEventListener(IOErrorEvent.IO_ERROR,configErrorHandler);
 			_urlLoader.removeEventListener(SecurityErrorEvent.SECURITY_ERROR,configErrorHandler);
 			_urlLoader.removeEventListener(ProgressEvent.PROGRESS, configLoading);
-			
-			_filesBytesTotal = (_xml.@total == null  || _xml.@total=="")?0:Number(_xml.@total);
-			
+		
 			_loaderStatus=LOADING_CONFIG_INITED;
 			var event:EasyLoaderEvent=new EasyLoaderEvent(EasyLoaderEvent.CONFIG_INITED,true);
 			dispatchEvent(event);
@@ -792,7 +828,7 @@ package com.ourbrander.loader{
 				start();
 			}
 		}
-		private function configErrorHandler(e:*):void {
+		private function configErrorHandler(e:Event):void {
 			_loaderStatus=LOADING_ERROR;
 			_urlLoader.removeEventListener(Event.COMPLETE,configLoaded);
 			_urlLoader.removeEventListener(IOErrorEvent.IO_ERROR,configErrorHandler);
@@ -811,10 +847,12 @@ package com.ourbrander.loader{
 
 		private function itemLoad():void {
 			_loaderStatus=LOADING_PROGRESS;
+			if(_index<0) _index=0;
 			var typeName:String=_loadList[_index].type;
 			_loadList[_index].setStatus(ITEM_STATUS_READY);
+			 
 			var type:String;
-			for (var i:* in _typeList) {
+			for (var i:Object in _typeList) {
 
 				if (_typeList[i]['list'].indexOf(typeName)>=0) {
 					type=_typeList[i]['name'];
@@ -843,8 +881,12 @@ package com.ourbrander.loader{
 				}else {
 					loadByMethod(_loadList[_index].method);
 				}
+				
+			
 
 			}
+			
+			
 			
 			function loadByMethod(t:String):void {
 			
@@ -866,37 +908,52 @@ package com.ourbrander.loader{
 			type=null;
 		}
 		private function getType(str:String):String {
-
-			return str.substring(str.lastIndexOf('.'));
+			var $type:String = str
+			var paramPos:int = str.indexOf("?");
+			if (paramPos >= 0) {
+				$type = $type.substring(0, paramPos);
+				$type = $type.substring(0, paramPos);
+			}
+			
+			$type=$type.substring($type.lastIndexOf('.'));
+			return $type
+		
 		}
 		private function getName(str:String):String {
-			return str.substring(str.lastIndexOf('/')+1);
+			var $name:String =str.substring(str.lastIndexOf('/')+1);
+			var paramPos:int = $name.indexOf("?");
+			if (paramPos >= 0) {
+				$name = $name.substring(0, paramPos);
+			}
+			
+			return $name
 		}
 		private function itemLoaded():void {
 		
 			_filesBytesLoaded = _filesBytesLoaded + _loadList[_index].bytesTotal;
-			
+		 
 			var event:EasyLoaderEvent=new EasyLoaderEvent(EasyLoaderEvent.ITEM_COMPLETED,{id:_index,target:_loadList[_index]});
 			dispatchEvent(event);
-
+		
 			if (_index<_loadList.length-1) {
 				_index++;
-				 
+				
 				itemLoad();
 			} else {
+			
 				allLoaded();
 			}
 
 		}
-		private function itemLoadError(e:*=null):void {
-
+		private function itemLoadError(e:Event=null):void {
+			
 			_loaderStatus=LOADING_ERROR;
 			var event:EasyLoaderEvent=new EasyLoaderEvent(EasyLoaderEvent.LOADING_ERROR);
 			event.data={index:_index,file:_loadList[_index],info:e};
 			dispatchEvent(event);
-
-			if (_ignoreError==true&&_index<_loadList.length-1) {
-				
+				 
+			if (_ignoreError==true &&_index<_loadList.length-1) {
+			
 				_index++;
 				itemLoad();
 			} else {
@@ -925,6 +982,7 @@ package com.ourbrander.loader{
 				_loadList[_index].setContent(loader.content);
 				_loadList[_index].setStatus(ITEM_STATUS_COMPLETED);
 				imageRemove(_loadList[_index].autoRemove);
+				
 				itemLoaded();
 			}
 
@@ -950,7 +1008,7 @@ package com.ourbrander.loader{
 				if (bol) {
 					try {
 						loader.close();
-					} catch (e:*) {
+					} catch (e:Error) {
 
 					}
 
@@ -978,7 +1036,9 @@ package com.ourbrander.loader{
 			_loadList[_index].setStatus(ITEM_STATUS_PROGRESS);
 			function textLoaded(e:Event):void {
 
-				var $content:*;
+				var $content:Object;
+				
+			
 				if (typeName==".xml"||_loadList[_index].method==LOADING_METHOD_XML) {
 					$content=new XML(e.target.data);
 					$content.ignoreWhitespace=true;
@@ -1019,7 +1079,7 @@ package com.ourbrander.loader{
 				if (bol) {
 					try {
 						textLoader.close();
-					} catch (e:*) {
+					} catch (e:Error) {
 
 					}
 					textLoader=null;
@@ -1076,11 +1136,11 @@ package com.ourbrander.loader{
 			function videoLoadStatus(e:NetStatusEvent):void {
 
 				if (e.info.code=="NetStream.Publish.BadName"||e.info.code=="NetStream.Play.StreamNotFound"||e.info.code=="NetStream.Play.Failed"||e.info.code=="NetStream.Play.NoSupportedTrackFound"||e.info.code=="NetStream.Play.FileStructureInvalid") {
-					videoLoadError(e.info.code);
+					videoLoadError(e);
 				}
 			}
 
-			function videoLoadError(e:String):void {
+			function videoLoadError(e:Event):void {
 
 				_loadList[_index].setStatus(ITEM_STATUS_FAULT);
 				videoRemove(true);
@@ -1100,13 +1160,13 @@ package com.ourbrander.loader{
 						try {
 							netStream.close();
 							netConn.close();
-						} catch (e:*) {
+						} catch (e:Error) {
 
 						}
 						netStream=null;
 						netConn=null;
 					}
-				} catch (e:*) {
+				} catch (e:Error) {
 
 				}
 			}
@@ -1147,7 +1207,7 @@ package com.ourbrander.loader{
 				if (bol) {
 					try {
 						sound.close();
-					} catch (e:*) {
+					} catch (e:Error) {
 					}
 					sound=null;
 				}
@@ -1159,11 +1219,59 @@ package com.ourbrander.loader{
 		}
 
 		private function allLoaded():void {
-			
+		
 			_loaderStatus=LOADING_COMPLETED;
 			var event:EasyLoaderEvent=new EasyLoaderEvent(EasyLoaderEvent.COMPLETED);
 			dispatchEvent(event);
 			_loaderStatus = FREE;
+			
+			
+		}
+		
+		// load twice and sent loaded event. maybe need change to other ways.
+		private function caculateSize():void {
+			var t:Number = getTimer();
+			
+				var loader:URLStream = new URLStream();
+				 
+				loader.addEventListener(ProgressEvent.PROGRESS,on_progress)
+				var request:URLRequest = new URLRequest();
+			
+				var k:uint = _index;
+				var size:Number = 0;
+				 next();
+			
+				function on_progress(e:ProgressEvent):void {
+					size += e.bytesTotal;
+				
+					loader.close();
+					k++
+					if (k >= _loadList.length) {
+						_filesBytesTotal = size;
+						
+						loader.removeEventListener(ProgressEvent.PROGRESS, on_progress);
+						loader = null;
+						request = null;
+						itemLoad();
+						
+						if (onGetSize != null) onGetSize();
+				
+					}
+					else
+						next();
+				}
+				
+				function next() :void {
+					
+						
+						
+						request.url = _loadList[k].path;
+					
+						loader.load(request);
+					
+				}
+				
+				
 		}
 		
 		
